@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Asclepios</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header>
+        <h1>Asclepios</h1>
+        <p>Local personal health journal and analysis agent</p>
+      </header>
+
+      <section class="card grid-two">
+        <div>
+          <h2>Daily check-in</h2>
+          <label for="period">Period</label>
+          <select id="period">
+            <option value="morning">Morning</option>
+            <option value="evening">Evening</option>
+            <option value="ad_hoc">Ad hoc</option>
+          </select>
+          <label for="rawText">What would you like to log?</label>
+          <textarea id="rawText" placeholder="Example: Slept 5 hours, mild headache, took 1 ibuprofen, blood pressure 145 over 92"></textarea>
+          <button id="submitCheckin">Save check-in</button>
+          <pre id="checkinResult" class="result"></pre>
+        </div>
+
+        <div>
+          <h2>Reminder settings</h2>
+          <div class="row">
+            <div>
+              <label for="morningTime">Morning time</label>
+              <input id="morningTime" type="time" value="08:00" />
+            </div>
+            <div>
+              <label for="eveningTime">Evening time</label>
+              <input id="eveningTime" type="time" value="20:00" />
+            </div>
+          </div>
+          <button id="saveReminders">Save reminders</button>
+          <pre id="reminderResult" class="result"></pre>
+
+          <h2>Document intake</h2>
+          <input id="docFile" type="file" />
+          <input id="docNote" type="text" placeholder="Optional note" />
+          <button id="uploadDocument">Upload document metadata</button>
+          <pre id="documentResult" class="result"></pre>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <h2>Dashboard</h2>
+          <button id="refreshDashboard">Refresh</button>
+        </div>
+        <div id="dashboardCounts" class="stats"></div>
+        <div class="grid-two">
+          <div>
+            <h3>Recent alerts</h3>
+            <div id="alerts"></div>
+          </div>
+          <div>
+            <h3>Recent entries</h3>
+            <div id="entries"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
