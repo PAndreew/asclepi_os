@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { BarChart2, Bell, BookOpen, Home, User } from 'lucide-react';
 import type { DocumentRecord, HealthSummary, RawEntry, Reminder, StructuredObservation, UserProfile } from '@asclepios/shared';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8787/api';
@@ -156,8 +157,8 @@ export function App() {
         <header className="navbar">
           <span className="nav-logo">Asclepios</span>
           <div className="topbar-icons">
-            <button className="icon-button" aria-label="Profile" onClick={() => setPage('profile')}>◌</button>
-            <button className="icon-button" aria-label="Notifications">◔</button>
+            <button className="icon-button" aria-label="Profile" onClick={() => setPage('profile')}><User size={18} /></button>
+            <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
           </div>
         </header>
 
@@ -456,15 +457,15 @@ export function App() {
 
         <nav className="bottom-nav" aria-label="Primary">
           <button className={page === 'home' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('home')}>
-            <span className="nav-icon">⌂</span>
+            <Home size={20} />
             <span>Home</span>
           </button>
           <button className={page === 'journal' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('journal')}>
-            <span className="nav-icon">☰</span>
+            <BookOpen size={20} />
             <span>Journal</span>
           </button>
           <button className={page === 'insights' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('insights')}>
-            <span className="nav-icon">▦</span>
+            <BarChart2 size={20} />
             <span>Visualise</span>
           </button>
         </nav>
