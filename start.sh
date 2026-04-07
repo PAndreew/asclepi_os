@@ -84,9 +84,7 @@ echo "[asclepios] server PID $SERVER_PID"
 
 # --- Start web UI ---
 echo "[asclepios] starting web UI on :5173..."
-"$SCRIPT_DIR/node_modules/.bin/vite" \
-  --config "$SCRIPT_DIR/apps/web/vite.config.ts" \
-  > /tmp/asclepios-web.log 2>&1 &
+npm run dev:web --prefix "$SCRIPT_DIR" > /tmp/asclepios-web.log 2>&1 &
 WEB_PID=$!
 echo "[asclepios] web PID $WEB_PID"
 
