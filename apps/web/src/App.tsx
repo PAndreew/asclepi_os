@@ -152,7 +152,6 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="phone-frame">
 
         <header className="navbar">
           <span className="nav-logo">Asclepios</span>
@@ -469,7 +468,6 @@ export function App() {
             <span>Visualise</span>
           </button>
         </nav>
-      </div>
     </div>
   );
 }
