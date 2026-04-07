@@ -36,6 +36,13 @@ export interface DocumentRecord {
   createdAt: string;
 }
 
+export interface UserProfile {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  email: string;
+}
+
 export interface HealthSummary {
   entriesLast7Days: number;
   observationsLast7Days: number;

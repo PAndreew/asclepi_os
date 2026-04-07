@@ -8,6 +8,7 @@ import { documentsRouter } from './routes/documents.js';
 import { observationsRouter } from './routes/observations.js';
 import { remindersRouter } from './routes/reminders.js';
 import { reportsRouter } from './routes/reports.js';
+import { profileRouter } from './routes/profile.js';
 import { startReminderScheduler } from './services/reminderScheduler.js';
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.use('/api/observations', observationsRouter);
 app.use('/api/reminders', remindersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/documents', documentsRouter);
+app.use('/api/profile', profileRouter);
 
 app.listen(port, host, () => {
   console.log(`Asclepios server listening on http://${host}:${port}`);

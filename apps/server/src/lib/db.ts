@@ -60,6 +60,15 @@ db.exec(`
     FOREIGN KEY(raw_entry_id) REFERENCES raw_entries(id)
   );
 
+  CREATE TABLE IF NOT EXISTS profile (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    first_name TEXT NOT NULL DEFAULT '',
+    last_name TEXT NOT NULL DEFAULT '',
+    date_of_birth TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_obs_metric ON structured_observations(metric);
   CREATE INDEX IF NOT EXISTS idx_obs_created_at ON structured_observations(created_at);
   CREATE INDEX IF NOT EXISTS idx_entries_created_at ON raw_entries(created_at);

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DocumentRecord, HealthSummary, RawEntry, Reminder, StructuredObservation } from '@asclepios/shared';
+import type { DocumentRecord, HealthSummary, RawEntry, Reminder, StructuredObservation, UserProfile } from '@asclepios/shared';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8787/api';
 
-type Page = 'home' | 'journal' | 'insights';
+type Page = 'home' | 'journal' | 'insights' | 'profile';
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -27,12 +27,6 @@ function periodLabel(period: RawEntry['period']) {
   return period.charAt(0).toUpperCase() + period.slice(1);
 }
 
-function metricLabel(summary: HealthSummary | null) {
-  if (!summary) return 'Loading…';
-  if (summary.averageSleepHoursLast7Days == null) return 'No sleep average yet';
-  return `${summary.averageSleepHoursLast7Days.toFixed(1)} hrs avg sleep`;
-}
-
 export function App() {
   const [page, setPage] = useState<Page>('home');
   const [rawText, setRawText] = useState('I slept 7 hours, mild headache in the morning, blood pressure 128 over 82.');
@@ -42,16 +36,20 @@ export function App() {
   const [summary, setSummary] = useState<HealthSummary | null>(null);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [profile, setProfile] = useState<UserProfile>({ firstName: '', lastName: '', dateOfBirth: '', email: '' });
+  const [profileDraft, setProfileDraft] = useState<UserProfile>({ firstName: '', lastName: '', dateOfBirth: '', email: '' });
+  const [profileSaved, setProfileSaved] = useState(false);
   const [lastSummary, setLastSummary] = useState('');
   const [submitError, setSubmitError] = useState('');
 
   async function loadData() {
-    const [entriesRes, observationsRes, summaryRes, remindersRes, documentsRes] = await Promise.all([
+    const [entriesRes, observationsRes, summaryRes, remindersRes, documentsRes, profileRes] = await Promise.all([
       fetch(`${API_BASE}/checkins`),
       fetch(`${API_BASE}/observations`),
       fetch(`${API_BASE}/reports/summary`),
       fetch(`${API_BASE}/reminders`),
       fetch(`${API_BASE}/documents`),
+      fetch(`${API_BASE}/profile`),
     ]);
 
     const loadedEntries = await entriesRes.json() as RawEntry[];
@@ -59,12 +57,15 @@ export function App() {
     const loadedSummary = await summaryRes.json() as HealthSummary;
     const loadedReminders = await remindersRes.json() as Reminder[];
     const loadedDocuments = await documentsRes.json() as DocumentRecord[];
+    const loadedProfile = await profileRes.json() as UserProfile;
 
     setEntries(loadedEntries.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
     setObservations(loadedObservations.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
     setSummary(loadedSummary);
     setReminders(loadedReminders);
     setDocuments(loadedDocuments.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
+    setProfile(loadedProfile);
+    setProfileDraft(loadedProfile);
   }
 
   useEffect(() => {
@@ -96,6 +97,17 @@ export function App() {
     }
   }
 
+  async function saveProfile() {
+    await fetch(`${API_BASE}/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profileDraft),
+    });
+    setProfile(profileDraft);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2500);
+  }
+
   async function uploadDocument(file: File) {
     const formData = new FormData();
     formData.append('file', file);
@@ -106,8 +118,8 @@ export function App() {
     await loadData();
   }
 
-  const latestEntry = entries[0];
   const latestObservation = observations[0];
+  const latestEntry = entries[0];
 
   const activityData = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, index) => {
@@ -136,38 +148,31 @@ export function App() {
 
   const topMetrics = useMemo(() => observations.slice(0, 6), [observations]);
 
+  const greeting = profile.firstName ? `Hi, ${profile.firstName}!` : 'Hi there!';
+
   return (
     <div className="app-shell">
       <div className="phone-frame">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Asclepios</p>
-            <h1>Hi, Emma!</h1>
-            <p className="headline-subtitle">Your calm, local-first health companion.</p>
-          </div>
+
+        <header className="navbar">
+          <span className="nav-logo">Asclepios</span>
           <div className="topbar-icons">
-            <button className="icon-button" aria-label="Profile">◌</button>
+            <button className="icon-button" aria-label="Profile" onClick={() => setPage('profile')}>◌</button>
             <button className="icon-button" aria-label="Notifications">◔</button>
           </div>
         </header>
 
         {page === 'home' && (
           <main className="page home-page">
-            <section className="hero-card">
-              <div className="hero-copy">
-                <p className="eyebrow">Daily check-in</p>
-                <h2>Let&apos;s capture how you feel today.</h2>
-                <p>{metricLabel(summary)}</p>
-              </div>
-              <div className="hero-heart" aria-hidden="true">❤</div>
+            <h1 className="greeting">{greeting}</h1>
 
-              <div className="floating-stat stat-left">
+            <div className="stat-row">
+              <div className="stat-tile">
                 <span className="label">Entries</span>
                 <strong>{summary?.entriesLast7Days ?? '—'}</strong>
                 <span className="subtle">last 7 days</span>
               </div>
-
-              <div className="floating-stat stat-right">
+              <div className="stat-tile">
                 <span className="label">Latest insight</span>
                 <strong>
                   {latestObservation?.valueNumber ?? latestObservation?.valueText ?? 'Stable'}
@@ -175,13 +180,12 @@ export function App() {
                 </strong>
                 <span className="subtle">{latestObservation?.metric ?? 'No observations yet'}</span>
               </div>
-            </section>
+            </div>
 
             <section className="chat-card card-soft">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Home</p>
-                  <h3>Daily chat check-in</h3>
+                  <h3>Daily check-in</h3>
                 </div>
                 <select value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
                   <option value="morning">Morning</option>
@@ -387,6 +391,66 @@ export function App() {
                   </li>
                 )) : <li>No uploads yet.</li>}
               </ul>
+            </section>
+          </main>
+        )}
+
+        {page === 'profile' && (
+          <main className="page">
+            <section className="section-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Account</p>
+                  <h2>Your profile</h2>
+                </div>
+              </div>
+
+              <div className="profile-form">
+                <label className="field-label">
+                  First name
+                  <input
+                    type="text"
+                    value={profileDraft.firstName}
+                    onChange={(e) => setProfileDraft({ ...profileDraft, firstName: e.target.value })}
+                    placeholder="Emma"
+                  />
+                </label>
+                <label className="field-label">
+                  Last name
+                  <input
+                    type="text"
+                    value={profileDraft.lastName}
+                    onChange={(e) => setProfileDraft({ ...profileDraft, lastName: e.target.value })}
+                    placeholder="Johnson"
+                  />
+                </label>
+                <label className="field-label">
+                  Date of birth
+                  <input
+                    type="date"
+                    value={profileDraft.dateOfBirth}
+                    onChange={(e) => setProfileDraft({ ...profileDraft, dateOfBirth: e.target.value })}
+                  />
+                </label>
+                <label className="field-label">
+                  Email
+                  <input
+                    type="email"
+                    value={profileDraft.email}
+                    onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })}
+                    placeholder="emma@example.com"
+                  />
+                </label>
+
+                <button className="primary-button" onClick={saveProfile}>Save profile</button>
+
+                {profileSaved && (
+                  <div className="status-card success" style={{ marginTop: '14px' }}>
+                    <strong>Saved</strong>
+                    <p>Your profile has been updated.</p>
+                  </div>
+                )}
+              </div>
             </section>
           </main>
         )}

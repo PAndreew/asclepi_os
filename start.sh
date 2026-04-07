@@ -5,6 +5,33 @@ LLAMA_SERVER="$HOME/bin/llama-b8681/llama-server"
 MODEL_PATH="$HOME/models/gemma-4-E2B-it-UD-Q8_K_XL.gguf"
 LLAMA_PORT=8080
 LLAMA_LOG="/tmp/llama-server.log"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- Parse flags ---
+REDEPLOY=false
+for arg in "$@"; do
+  case "$arg" in
+    --redeploy|-r) REDEPLOY=true ;;
+  esac
+done
+
+# --- Redeploy: pull latest changes and restart app processes ---
+if [ "$REDEPLOY" = true ]; then
+  echo "[redeploy] Pulling latest changes..."
+  git -C "$SCRIPT_DIR" pull
+
+  echo "[redeploy] Installing dependencies..."
+  eval "$(fnm env --use-on-cd 2>/dev/null)" || true
+  fnm use 22 2>/dev/null || true
+  npm install --prefix "$SCRIPT_DIR"
+
+  echo "[redeploy] Stopping existing app processes..."
+  pkill -f "tsx watch src/index.ts" 2>/dev/null || true
+  pkill -f "vite --config.*apps/web" 2>/dev/null || true
+  pkill -f "vite.*apps/web/vite.config.ts" 2>/dev/null || true
+  sleep 1
+  echo "[redeploy] Done. Restarting..."
+fi
 
 # --- Check model file ---
 if [ ! -f "$MODEL_PATH" ]; then
@@ -45,8 +72,7 @@ else
   done
 fi
 
-# --- Start asclepios ---
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# --- Start asclepios backend ---
 cd "$SCRIPT_DIR"
 echo "[asclepios] starting server..."
 eval "$(fnm env --use-on-cd 2>/dev/null)" || true
@@ -68,5 +94,11 @@ echo ""
 echo "  API:    http://127.0.0.1:8787/api"
 echo "  Web UI: http://$(hostname -I | awk '{print $1}'):5173"
 echo ""
+echo "  Logs:   /tmp/asclepios-server.log  /tmp/asclepios-web.log"
+echo ""
+echo "  To redeploy after changes: ./start.sh --redeploy"
+echo ""
+
+trap "echo 'Shutting down...'; kill $SERVER_PID $WEB_PID 2>/dev/null; exit 0" INT TERM
 
 wait $SERVER_PID
