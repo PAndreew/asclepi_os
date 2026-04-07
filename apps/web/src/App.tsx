@@ -1,9 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DocumentRecord, HealthSummary, RawEntry, Reminder, StructuredObservation } from '@asclepios/shared';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8787/api';
 
+type Page = 'home' | 'journal' | 'insights';
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function periodLabel(period: RawEntry['period']) {
+  if (period === 'freeform') return 'Open note';
+  return period.charAt(0).toUpperCase() + period.slice(1);
+}
+
+function metricLabel(summary: HealthSummary | null) {
+  if (!summary) return 'Loading…';
+  if (summary.averageSleepHoursLast7Days == null) return 'No sleep average yet';
+  return `${summary.averageSleepHoursLast7Days.toFixed(1)} hrs avg sleep`;
+}
+
 export function App() {
+  const [page, setPage] = useState<Page>('home');
   const [rawText, setRawText] = useState('I slept 7 hours, mild headache in the morning, blood pressure 128 over 82.');
   const [period, setPeriod] = useState<'morning' | 'evening' | 'freeform'>('morning');
   const [entries, setEntries] = useState<RawEntry[]>([]);
@@ -23,11 +54,17 @@ export function App() {
       fetch(`${API_BASE}/documents`),
     ]);
 
-    setEntries(await entriesRes.json());
-    setObservations(await observationsRes.json());
-    setSummary(await summaryRes.json());
-    setReminders(await remindersRes.json());
-    setDocuments(await documentsRes.json());
+    const loadedEntries = await entriesRes.json() as RawEntry[];
+    const loadedObservations = await observationsRes.json() as StructuredObservation[];
+    const loadedSummary = await summaryRes.json() as HealthSummary;
+    const loadedReminders = await remindersRes.json() as Reminder[];
+    const loadedDocuments = await documentsRes.json() as DocumentRecord[];
+
+    setEntries(loadedEntries.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
+    setObservations(loadedObservations.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
+    setSummary(loadedSummary);
+    setReminders(loadedReminders);
+    setDocuments(loadedDocuments.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
   }
 
   useEffect(() => {
@@ -52,8 +89,9 @@ export function App() {
       const data = await response.json() as { summary?: string };
       setLastSummary(data.summary || 'Saved.');
       setRawText('');
+      setPage('journal');
       await loadData();
-    } catch (err) {
+    } catch {
       setSubmitError('Could not reach the server. Is it running?');
     }
   }
@@ -68,106 +106,306 @@ export function App() {
     await loadData();
   }
 
+  const latestEntry = entries[0];
+  const latestObservation = observations[0];
+
+  const activityData = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      return {
+        key: date.toISOString().slice(0, 10),
+        label: date.toLocaleDateString(undefined, { weekday: 'short' }),
+        count: 0,
+      };
+    });
+
+    for (const entry of entries) {
+      const key = new Date(entry.createdAt).toISOString().slice(0, 10);
+      const day = days.find((item) => item.key === key);
+      if (day) day.count += 1;
+    }
+
+    const maxCount = Math.max(1, ...days.map((item) => item.count));
+    return days.map((item) => ({
+      ...item,
+      height: `${28 + (item.count / maxCount) * 92}px`,
+    }));
+  }, [entries]);
+
+  const topMetrics = useMemo(() => observations.slice(0, 6), [observations]);
+
   return (
-    <div className="shell">
-      <header className="hero">
-        <div>
-          <h1>Asclepios</h1>
-          <p>Local-first personal health tracking and analysis.</p>
-        </div>
-        <div className="badge">Phase 1 MVP</div>
-      </header>
+    <div className="app-shell">
+      <div className="phone-frame">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Asclepios</p>
+            <h1>Hi, Emma!</h1>
+            <p className="headline-subtitle">Your calm, local-first health companion.</p>
+          </div>
+          <div className="topbar-icons">
+            <button className="icon-button" aria-label="Profile">◌</button>
+            <button className="icon-button" aria-label="Notifications">◔</button>
+          </div>
+        </header>
 
-      <section className="grid two">
-        <div className="card">
-          <h2>Daily check-in</h2>
-          <label>
-            Period
-            <select value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
-              <option value="morning">Morning</option>
-              <option value="evening">Evening</option>
-              <option value="freeform">Freeform</option>
-            </select>
-          </label>
-          <label>
-            Raw entry
-            <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} rows={6} />
-          </label>
-          <button onClick={submitCheckIn}>Save check-in</button>
-          {lastSummary && <p className="muted"><strong>Agent summary:</strong> {lastSummary}</p>}
-          {submitError && <p className="muted" style={{ color: 'red' }}>{submitError}</p>}
-        </div>
+        {page === 'home' && (
+          <main className="page home-page">
+            <section className="hero-card">
+              <div className="hero-copy">
+                <p className="eyebrow">Daily check-in</p>
+                <h2>Let&apos;s capture how you feel today.</h2>
+                <p>{metricLabel(summary)}</p>
+              </div>
+              <div className="hero-heart" aria-hidden="true">❤</div>
 
-        <div className="card">
-          <h2>Weekly snapshot</h2>
-          {summary ? (
-            <ul className="stats">
-              <li><strong>{summary.entriesLast7Days}</strong><span>entries</span></li>
-              <li><strong>{summary.observationsLast7Days}</strong><span>observations</span></li>
-              <li><strong>{summary.symptomMentionsLast7Days}</strong><span>symptom mentions</span></li>
-              <li><strong>{summary.averageSleepHoursLast7Days ?? '—'}</strong><span>avg sleep hours</span></li>
-            </ul>
-          ) : (
-            <p>Loading…</p>
-          )}
-        </div>
-      </section>
+              <div className="floating-stat stat-left">
+                <span className="label">Entries</span>
+                <strong>{summary?.entriesLast7Days ?? '—'}</strong>
+                <span className="subtle">last 7 days</span>
+              </div>
 
-      <section className="grid two">
-        <div className="card">
-          <h2>Reminders</h2>
-          <ul>
-            {reminders.map((reminder) => (
-              <li key={reminder.id}>{reminder.scheduleTime} — {reminder.label}</li>
-            ))}
-          </ul>
-        </div>
+              <div className="floating-stat stat-right">
+                <span className="label">Latest insight</span>
+                <strong>
+                  {latestObservation?.valueNumber ?? latestObservation?.valueText ?? 'Stable'}
+                  {latestObservation?.unit ? ` ${latestObservation.unit}` : ''}
+                </strong>
+                <span className="subtle">{latestObservation?.metric ?? 'No observations yet'}</span>
+              </div>
+            </section>
 
-        <div className="card">
-          <h2>Documents</h2>
-          <input type="file" accept="application/pdf,image/*" onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) uploadDocument(file).catch(console.error);
-          }} />
-          <ul>
-            {documents.map((document) => (
-              <li key={document.id}>{document.originalName} — {document.extractionStatus}</li>
-            ))}
-          </ul>
-        </div>
-      </section>
+            <section className="chat-card card-soft">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Home</p>
+                  <h3>Daily chat check-in</h3>
+                </div>
+                <select value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
+                  <option value="morning">Morning</option>
+                  <option value="evening">Evening</option>
+                  <option value="freeform">Freeform</option>
+                </select>
+              </div>
 
-      <section className="grid two">
-        <div className="card">
-          <h2>Recent entries</h2>
-          <ul className="timeline">
-            {entries.map((entry) => (
-              <li key={entry.id}>
-                <strong>{entry.period}</strong>
-                <span>{entry.createdAt}</span>
-                <p>{entry.rawText}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
+              <div className="chat-thread">
+                <div className="chat-bubble assistant">
+                  Tell me how your day feels so far — symptoms, sleep, mood, medication, or anything else you want to log.
+                </div>
+                {latestEntry && (
+                  <div className="chat-bubble user">
+                    <span className="bubble-meta">Last saved · {formatDateTime(latestEntry.createdAt)}</span>
+                    {latestEntry.rawText}
+                  </div>
+                )}
+              </div>
 
-        <div className="card">
-          <h2>Extracted observations</h2>
-          <ul className="timeline">
-            {observations.map((observation) => (
-              <li key={observation.id}>
-                <strong>{observation.metric}</strong>
-                <span>{observation.createdAt}</span>
-                <p>
-                  {observation.valueNumber ?? observation.valueText ?? 'not set'}
-                  {observation.unit ? ` ${observation.unit}` : ''}
-                  {' '}· confidence {Math.round(observation.confidence * 100)}%
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+              <label className="input-label">
+                Your note
+                <textarea
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  rows={5}
+                  placeholder="I slept 7 hours, feel rested, and my headache is lighter than yesterday..."
+                />
+              </label>
+
+              <div className="action-row">
+                <button className="primary-button" onClick={submitCheckIn}>Save check-in</button>
+                <button className="secondary-button" onClick={() => setPage('journal')}>Open journal</button>
+              </div>
+
+              {lastSummary && (
+                <div className="status-card success">
+                  <strong>Agent summary</strong>
+                  <p>{lastSummary}</p>
+                </div>
+              )}
+              {submitError && (
+                <div className="status-card error">
+                  <strong>Couldn&apos;t save</strong>
+                  <p>{submitError}</p>
+                </div>
+              )}
+            </section>
+
+            <section className="home-grid">
+              <div className="mini-card">
+                <p className="eyebrow">Reminders</p>
+                <ul className="simple-list compact-list">
+                  {reminders.length ? reminders.map((reminder) => (
+                    <li key={reminder.id}>
+                      <strong>{reminder.scheduleTime}</strong>
+                      <span>{reminder.label}</span>
+                    </li>
+                  )) : <li>No reminders yet.</li>}
+                </ul>
+              </div>
+
+              <div className="mini-card accent-card">
+                <p className="eyebrow">Weekly snapshot</p>
+                <div className="summary-big">{summary?.symptomMentionsLast7Days ?? 0}</div>
+                <p>symptom mentions noted in the last 7 days.</p>
+              </div>
+            </section>
+          </main>
+        )}
+
+        {page === 'journal' && (
+          <main className="page">
+            <section className="section-card">
+              <div className="section-heading journal-header">
+                <div>
+                  <p className="eyebrow">Journal</p>
+                  <h2>Previous conversations</h2>
+                </div>
+                <span className="soft-pill">{entries.length} saved</span>
+              </div>
+
+              <div className="list-view">
+                {entries.length ? entries.map((entry) => (
+                  <article className="journal-item" key={entry.id}>
+                    <div className="journal-topline">
+                      <span className="soft-pill">{periodLabel(entry.period)}</span>
+                      <span className="subtle">{formatDateTime(entry.createdAt)}</span>
+                    </div>
+                    <p>{entry.rawText}</p>
+                  </article>
+                )) : (
+                  <div className="empty-state">No conversations yet. Save a daily check-in from Home to start your journal.</div>
+                )}
+              </div>
+            </section>
+          </main>
+        )}
+
+        {page === 'insights' && (
+          <main className="page insights-page">
+            <section className="section-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Table & visualisation</p>
+                  <h2>Health overview</h2>
+                </div>
+                <span className="soft-pill">Last 7 days</span>
+              </div>
+
+              <div className="metric-grid">
+                <div className="metric-tile">
+                  <span>Entries</span>
+                  <strong>{summary?.entriesLast7Days ?? '—'}</strong>
+                </div>
+                <div className="metric-tile">
+                  <span>Observations</span>
+                  <strong>{summary?.observationsLast7Days ?? '—'}</strong>
+                </div>
+                <div className="metric-tile">
+                  <span>Symptoms</span>
+                  <strong>{summary?.symptomMentionsLast7Days ?? '—'}</strong>
+                </div>
+                <div className="metric-tile">
+                  <span>Sleep average</span>
+                  <strong>{summary?.averageSleepHoursLast7Days?.toFixed(1) ?? '—'}</strong>
+                </div>
+              </div>
+
+              <div className="chart-card">
+                <div className="chart-title-row">
+                  <h3>Check-in activity</h3>
+                  <span className="subtle">Past week</span>
+                </div>
+                <div className="mini-chart" aria-label="Weekly activity chart">
+                  {activityData.map((item) => (
+                    <div className="bar-group" key={item.key}>
+                      <div className="bar" style={{ height: item.height }} title={`${item.label}: ${item.count} entries`} />
+                      <span>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="table-card">
+                <div className="chart-title-row">
+                  <h3>Recent observations</h3>
+                  <span className="subtle">Latest extracted metrics</span>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                        <th>Confidence</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topMetrics.length ? topMetrics.map((observation) => (
+                        <tr key={observation.id}>
+                          <td>{observation.metric}</td>
+                          <td>
+                            {observation.valueNumber ?? observation.valueText ?? '—'}
+                            {observation.unit ? ` ${observation.unit}` : ''}
+                          </td>
+                          <td>{Math.round(observation.confidence * 100)}%</td>
+                          <td>{formatDate(observation.createdAt)}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={4}>No observations yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="section-heading docs-heading">
+                <h3>Documents</h3>
+                <label className="upload-button">
+                  Upload
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadDocument(file).catch(console.error);
+                    }}
+                  />
+                </label>
+              </div>
+              <ul className="simple-list">
+                {documents.length ? documents.map((document) => (
+                  <li key={document.id}>
+                    <div>
+                      <strong>{document.originalName}</strong>
+                      <span>{formatDateTime(document.createdAt)}</span>
+                    </div>
+                    <span className={`status-tag ${document.extractionStatus}`}>{document.extractionStatus}</span>
+                  </li>
+                )) : <li>No uploads yet.</li>}
+              </ul>
+            </section>
+          </main>
+        )}
+
+        <nav className="bottom-nav" aria-label="Primary">
+          <button className={page === 'home' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('home')}>
+            <span className="nav-icon">⌂</span>
+            <span>Home</span>
+          </button>
+          <button className={page === 'journal' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('journal')}>
+            <span className="nav-icon">☰</span>
+            <span>Journal</span>
+          </button>
+          <button className={page === 'insights' ? 'nav-item active' : 'nav-item'} onClick={() => setPage('insights')}>
+            <span className="nav-icon">▦</span>
+            <span>Visualise</span>
+          </button>
+        </nav>
+      </div>
     </div>
   );
 }
