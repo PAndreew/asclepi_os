@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../lib/db.js';
+import { db, insertAlert, insertMetricCandidate, insertObservation, insertRawEntry } from '../lib/db.js';
 import { deriveAlerts } from '../services/alerts.js';
 import { extractObservations } from '../services/extractor.js';
 import { summarizeEntry } from '../services/modelGateway.js';
@@ -14,52 +14,72 @@ checkinsRouter.get('/', (_req, res) => {
 });
 
 checkinsRouter.post('/', async (req, res) => {
-  const { rawText, period = 'freeform', source = 'checkin' } = req.body as {
+  const body = req.body as {
     rawText?: string;
     period?: string;
     source?: string;
   };
 
-  if (!rawText || !rawText.trim()) {
+  const rawText = (body.rawText || '').trim();
+  const period = body.period || 'freeform';
+  const source = body.source || 'checkin';
+
+  if (!rawText) {
     return res.status(400).json({ error: 'rawText is required' });
   }
 
-  const insert = db.prepare(
-    'INSERT INTO raw_entries (period, source, raw_text) VALUES (?, ?, ?)'
-  );
-  const result = insert.run(period, source, rawText.trim());
-  const rawEntryId = Number(result.lastInsertRowid);
+  const rawEntryId = insertRawEntry(period, source, rawText);
+  const extraction = extractObservations(rawText);
 
-  const observations = extractObservations(rawText);
-  const insertObservation = db.prepare(
-    'INSERT INTO structured_observations (raw_entry_id, category, metric, value_text, value_number, unit, confidence) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  );
-
-  for (const observation of observations) {
-    insertObservation.run(
+  for (const observation of extraction.observations) {
+    insertObservation({
       rawEntryId,
-      observation.category,
-      observation.metric,
-      observation.valueText,
-      observation.valueNumber,
-      observation.unit,
-      observation.confidence
-    );
+      category: observation.category,
+      metricKey: observation.metricKey,
+      sourceMetricLabel: observation.sourceMetricLabel,
+      valueType: observation.valueType,
+      valueText: observation.valueText,
+      valueNumber: observation.valueNumber,
+      valueBoolean: observation.valueBoolean,
+      unitOriginal: observation.unitOriginal,
+      unitCanonical: observation.unitCanonical,
+      confidence: observation.confidence,
+      provenanceJson: JSON.stringify(observation.provenance),
+    });
   }
 
-  const alerts = deriveAlerts(observations, rawText);
-  const insertAlert = db.prepare(
-    'INSERT INTO alerts (raw_entry_id, level, title, body) VALUES (?, ?, ?, ?)'
-  );
+  for (const candidate of extraction.metricCandidates) {
+    insertMetricCandidate({
+      rawEntryId,
+      candidateLabel: candidate.candidateLabel,
+      normalizedKey: candidate.normalizedKey,
+      sampleValueText: candidate.sampleValueText,
+      sampleUnit: candidate.sampleUnit,
+      reason: candidate.reason,
+      confidence: candidate.confidence,
+      provenanceJson: JSON.stringify(candidate.provenance),
+    });
+  }
+
+  const alerts = deriveAlerts(extraction.observations, rawText);
   for (const alert of alerts) {
-    insertAlert.run(rawEntryId, alert.level, alert.title, alert.body);
+    insertAlert({
+      rawEntryId,
+      level: alert.level,
+      title: alert.title,
+      body: alert.body,
+      ruleKey: alert.ruleKey,
+      metricKey: alert.metricKey,
+      provenanceJson: JSON.stringify(alert.provenance),
+    });
   }
 
   const summary = await summarizeEntry(rawText);
 
   res.status(201).json({
     rawEntryId,
-    extractedCount: observations.length,
+    extractedCount: extraction.observations.length,
+    candidateCount: extraction.metricCandidates.length,
     alerts,
     summary,
   });

@@ -166,22 +166,6 @@ export function App() {
           <main className="page home-page">
             <h1 className="greeting">{greeting}</h1>
 
-            <div className="stat-row">
-              <div className="stat-tile">
-                <span className="label">Entries</span>
-                <strong>{summary?.entriesLast7Days ?? '—'}</strong>
-                <span className="subtle">last 7 days</span>
-              </div>
-              <div className="stat-tile">
-                <span className="label">Latest insight</span>
-                <strong>
-                  {latestObservation?.valueNumber ?? latestObservation?.valueText ?? 'Stable'}
-                  {latestObservation?.unit ? ` ${latestObservation.unit}` : ''}
-                </strong>
-                <span className="subtle">{latestObservation?.metric ?? 'No observations yet'}</span>
-              </div>
-            </div>
-
             <section className="chat-card card-soft">
               <div className="section-heading">
                 <div>

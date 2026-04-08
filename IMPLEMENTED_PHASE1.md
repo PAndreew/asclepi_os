@@ -1,47 +1,38 @@
-# Implemented Phase 1
+# Implemented backend refactor
 
-Created a local-first scaffold in `/home/pi/Documents/asclepi_os` with:
+## Canonical backend
+- `apps/server` is now the canonical backend target
+- `apps/web` remains the current frontend target
+- `packages/shared` was updated for the normalized model
+- legacy `server/` can be removed or archived manually
 
-- TypeScript/Node local server
-- SQLite database bootstrap
-- Static web UI
-- Check-in ingestion API
-- Raw entry storage
-- Structured observation extraction
-- Basic alert derivation
-- Reminder settings API
-- Document upload metadata API
-- Local OpenAI-compatible model gateway scaffold
-- Dashboard and summary report endpoints
+## Implemented changes
+- Introduced `metric_definitions`
+- Introduced `metric_aliases`
+- Introduced `metric_candidates`
+- Replaced `structured_observations` as the active model with normalized `observations`
+- Added deterministic `alert_rules`
+- Added alert provenance storage in `alerts`
+- Added legacy migration logic from `structured_observations` to `observations`
+- Added metrics API endpoints
+- Updated summary reporting to use normalized observations
 
 ## Main endpoints
 - `GET /api/health`
-- `GET /api/dashboard`
-- `POST /api/checkins`
 - `GET /api/checkins`
-- `POST /api/reminders`
+- `POST /api/checkins`
+- `GET /api/observations`
+- `GET /api/alerts`
+- `GET /api/metrics`
+- `GET /api/metrics/aliases`
+- `GET /api/metrics/candidates`
 - `GET /api/reports/summary`
-- `POST /api/documents`
+- `GET /api/reminders`
+- `POST /api/reminders`
+- `GET /api/documents`
+- `POST /api/documents/upload`
+- `GET /api/profile`
+- `PUT /api/profile`
 
-## Files added
-- `README.md`
-- `package.json`
-- `tsconfig.json`
-- `.env.example`
-- `server/src/schema.ts`
-- `server/src/db.ts`
-- `server/src/extract.ts`
-- `server/src/alerts.ts`
-- `server/src/modelGateway.ts`
-- `server/src/healthAgent.ts`
-- `server/src/index.ts`
-- `server/public/index.html`
-- `server/public/app.js`
-- `server/public/styles.css`
-
-## Next build step
-- wire in PI/BeeZee health-only tools
-- add encrypted storage unlock flow
-- add real PDF/image extraction
-- add charts/PDF report export
-- add notification scheduler
+## Design outcome
+The backend now uses a stable schema with row-based observations and a flexible metric catalog. New or unknown metrics are captured as candidates instead of mutating the schema at runtime.

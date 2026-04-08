@@ -5,10 +5,11 @@ import './lib/db.js';
 import { alertsRouter } from './routes/alerts.js';
 import { checkinsRouter } from './routes/checkins.js';
 import { documentsRouter } from './routes/documents.js';
+import { metricsRouter } from './routes/metrics.js';
 import { observationsRouter } from './routes/observations.js';
+import { profileRouter } from './routes/profile.js';
 import { remindersRouter } from './routes/reminders.js';
 import { reportsRouter } from './routes/reports.js';
-import { profileRouter } from './routes/profile.js';
 import { startReminderScheduler } from './services/reminderScheduler.js';
 
 dotenv.config();
@@ -21,12 +22,13 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'asclepios-server' });
+  res.json({ ok: true, service: 'asclepios-server', canonicalBackend: 'apps/server' });
 });
 
 app.use('/api/checkins', checkinsRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/observations', observationsRouter);
+app.use('/api/metrics', metricsRouter);
 app.use('/api/reminders', remindersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/documents', documentsRouter);

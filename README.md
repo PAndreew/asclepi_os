@@ -1,43 +1,58 @@
-# Asclepios Phase 1
+# Asclepios
 
-Local-first personal health data gatherer, organiser and analyser.
+Local-first personal health journal and assistant scaffold.
 
-## Phase 1 included
-- Local web UI
-- Morning/evening free-text check-ins
-- Raw entry storage
-- Structured observation extraction
-- Basic reminder settings storage
-- Simple suspicious-pattern alerting
-- Local SQLite database
-- Local OpenAI-compatible model gateway stub
-- Report summary endpoint scaffold
-- Document upload metadata scaffold
+## Structure
 
-## Architecture
-- `server/`: local Node/TypeScript server and static web UI
-- `server/public/`: browser UI
-- `server/src/db.ts`: SQLite setup and queries
-- `server/src/extract.ts`: simple natural-language extraction for sleep, blood pressure, weight, temperature, medications, symptoms
-- `server/src/alerts.ts`: threshold-based flags
-- `server/src/modelGateway.ts`: local OpenAI-compatible endpoint wrapper scaffold for Ollama / llama.cpp
-- `server/src/healthAgent.ts`: constrained health-agent orchestration layer
+| Path | Role |
+|---|---|
+| `apps/server` | Canonical backend (Express + SQLite) |
+| `apps/web` | React web client |
+| `packages/shared` | Shared TypeScript types |
 
 ## Quick start
-1. Install Node.js 20+
-2. In this folder run `npm install`
-3. Copy `.env.example` to `.env`
-4. Run `npm run dev`
-5. Open `http://localhost:8787`
 
-## Notes
-- The agent is designed to access only the health database layer, not the host OS.
-- PDF/image ingestion is scaffolded for Phase 2, but metadata endpoints already exist.
-- The extraction layer is intentionally deterministic-first for safety.
+```bash
+npm install
+npm run dev
+```
 
-## Next recommended steps
-1. Replace rule extractor with PI/BeeZee-compatible tool runner
-2. Add encrypted-at-rest key handling
-3. Add PDF parsing pipeline
-4. Add local notification daemon
-5. Add phone pairing / private network access
+Server runs on `http://127.0.0.1:8787`.
+
+## Backend capabilities
+
+- Free-text morning, evening, and freeform check-ins
+- Raw entry preservation in SQLite
+- Normalized observation storage (`observations` table)
+- Curated `metric_definitions` and `metric_aliases`
+- Deterministic alert rules with stored provenance
+- Candidate metric capture for unmapped labels
+- Reminder storage
+- Document upload metadata scaffold
+- Local OpenAI-compatible summary gateway scaffold
+
+## Design principles
+
+- Raw source preserved first, extraction second
+- Deterministic extraction and alerting — LLMs assist with summaries only
+- Stable schema: row-based observations, flexible metric growth via definitions, aliases, and candidates
+
+## API
+
+```
+GET  /api/health
+GET  /api/checkins
+POST /api/checkins
+GET  /api/observations
+GET  /api/alerts
+GET  /api/metrics
+GET  /api/metrics/aliases
+GET  /api/metrics/candidates
+GET  /api/reports/summary
+GET  /api/reminders
+POST /api/reminders
+GET  /api/documents
+POST /api/documents/upload
+GET  /api/profile
+PUT  /api/profile
+```
